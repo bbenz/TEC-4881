@@ -1,0 +1,41 @@
+question,expectedId
+"Where is cargo ABC123?",ABC123
+"What is the current status of ABC123?",ABC123
+"Which cargo is going from Hong Kong to Helsinki?",ABC123
+"Which shipment last reached New York on the way to Helsinki?",ABC123
+"What cargo should be loaded at New York next?",ABC123
+"Tell me the ETA for the Hong Kong to Helsinki cargo.",ABC123
+"Which cargo is routed and in port at New York?",ABC123
+"What is happening with tracking ID ABC123?",ABC123
+"Which cargo has Helsinki as the destination?",ABC123
+"Find the cargo that started in Hong Kong and is not going to Melbourne.",ABC123
+"Where is cargo JKL567?",JKL567
+"What is the status of JKL567?",JKL567
+"Which cargo is misdirected?",JKL567
+"Which shipment is going from Hangzou to Stockholm?",JKL567
+"Which cargo was loaded on the wrong voyage?",JKL567
+"What cargo is onboard from New York but should reach Stockholm?",JKL567
+"Which tracking ID needs rerouting because it is misdirected?",JKL567
+"Find the Stockholm cargo.",JKL567
+"Which cargo originated in Hangzou?",JKL567
+"What is the destination for JKL567?",JKL567
+"Where is cargo DEF789?",DEF789
+"What cargo is not routed yet?",DEF789
+"Which shipment goes from Hong Kong to Melbourne?",DEF789
+"Which cargo has not been received?",DEF789
+"Tell me about the Melbourne shipment.",DEF789
+"Which tracking ID has no itinerary?",DEF789
+"Find the cargo with destination Melbourne.",DEF789
+"What is the status of DEF789?",DEF789
+"Which Hong Kong cargo is waiting for routing?",DEF789
+"Which cargo is planned two months out?",DEF789
+"Where is cargo MNO456?",MNO456
+"What cargo was claimed in Dallas?",MNO456
+"Which shipment goes from New York to Dallas?",MNO456
+"Which cargo completed customs in Dallas?",MNO456
+"Tell me about tracking ID MNO456.",MNO456
+"Which cargo is already claimed?",MNO456
+"Find the Dallas shipment.",MNO456
+"What cargo used the New York to Dallas route?",MNO456
+"Which shipment can start a claim after delivery?",MNO456
+"What is the status of MNO456?",MNO456
