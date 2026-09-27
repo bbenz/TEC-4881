@@ -179,6 +179,7 @@
         <version>2.43.0</version>
         <configuration>
           <java>
+            <toggleOffOn/>
             <googleJavaFormat>
               <version>1.18.1</version>
             </googleJavaFormat>

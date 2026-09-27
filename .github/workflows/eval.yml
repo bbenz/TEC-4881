@@ -1,0 +1,40 @@
+name: Eval
+
+on:
+  pull_request:
+    paths:
+    - src/main/resources/prompts/**
+    - src/main/ai-docs/**
+    - src/test/resources/eval/**
+    - k8s/configmap.yaml
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - uses: actions/setup-java@v6.0.1
+      with:
+        distribution: microsoft
+        java-version: "21"
+        cache: maven
+    - name: Check eval secrets
+      id: secrets
+      env:
+        AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+        AI_API_KEY: ${{ secrets.AI_API_KEY }}
+      run: |
+        if [ -z "$AI_BASE_URL" ] || [ -z "$AI_API_KEY" ]; then
+          echo "::notice::AI_BASE_URL or AI_API_KEY is not set. Skipping eval tests."
+          echo "run_eval=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "run_eval=true" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Run eval tests
+      if: steps.secrets.outputs.run_eval == 'true'
+      env:
+        AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+        AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        AI_CHAT_MODEL: ${{ vars.AI_CHAT_MODEL }}
+      run: mvn -B -Popenliberty -Dtest=CargoAssistantEvalTest test

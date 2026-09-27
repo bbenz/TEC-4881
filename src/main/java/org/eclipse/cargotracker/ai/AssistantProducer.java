@@ -11,6 +11,7 @@ public class AssistantProducer {
 
   @Produces
   @ApplicationScoped
+  // spotless:off
   CargoAssistant assistant(
       ChatModel model,
       ContentRetriever docs,
@@ -21,4 +22,5 @@ public class AssistantProducer {
         .tools(tools)
         .build();
   }
+  // spotless:on
 }

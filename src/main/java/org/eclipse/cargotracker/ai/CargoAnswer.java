@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
+// spotless:off
 public record CargoAnswer(
     @NotBlank String answer,
     @NotNull List<String> trackingIds,
@@ -14,3 +15,4 @@ public record CargoAnswer(
     return new CargoAnswer("I can't answer that.", List.of(), List.of());
   }
 }
+// spotless:on
