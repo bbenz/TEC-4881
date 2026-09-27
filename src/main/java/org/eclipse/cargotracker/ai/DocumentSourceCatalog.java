@@ -16,7 +16,10 @@ public class DocumentSourceCatalog {
   }
 
   public boolean isKnown(String source) {
-    return source != null && (source.startsWith("tool:") || sources.contains(source));
+    return source != null
+        && (source.equals("tool:cargoStatus")
+            || source.equals("tool:listCargos")
+            || sources.contains(source));
   }
 
   public Set<String> all() {

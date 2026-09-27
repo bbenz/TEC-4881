@@ -11,16 +11,11 @@ public class AssistantProducer {
 
   @Produces
   @ApplicationScoped
-  // spotless:off
-  CargoAssistant assistant(
-      ChatModel model,
-      ContentRetriever docs,
-      CargoTools tools) {
+  CargoAssistant assistant(ChatModel model, ContentRetriever docs, CargoTools tools) {
     return AiServices.builder(CargoAssistant.class)
         .chatModel(model)
         .contentRetriever(docs)
         .tools(tools)
         .build();
   }
-  // spotless:on
 }

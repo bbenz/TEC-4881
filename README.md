@@ -31,7 +31,8 @@ This repo is based on [Eclipse Cargo Tracker](CARGO-TRACKER.md). It keeps the up
 - `src/test/resources/eval`: eval questions and refusal cases.
 - `k8s`: deployment, service, config, tracing config, and secret example.
 - `Dockerfile`: Open Liberty image for Java 21.
-- `.github/workflows/ci.yml`: offline CI and optional eval job.
+- `.github/workflows/ci.yml`: offline CI.
+- `.github/workflows/eval.yml`: model evals for prompt, AI code, document, eval data, and model config changes. The workflow reads the model from `k8s/configmap.yaml`.
 
 ## Run locally with Open Liberty
 
@@ -49,16 +50,21 @@ To call an OpenAI-compatible endpoint, set these values before starting Liberty:
 
 ```powershell
 $env:AI_ENABLED = "true"
-$env:AI_BASE_URL = "https://models.inference.ai.azure.com/v1"
-$env:AI_API_KEY = "your key"
-$env:AI_CHAT_MODEL = "gpt-5-mini"
+$env:AI_BASE_URL = "YOUR_OPENAI_COMPATIBLE_ENDPOINT"
+$env:AI_API_KEY = "YOUR_KEY"
+$env:AI_CHAT_MODEL = "YOUR_MODEL"
 $env:AI_TIMEOUT_SECONDS = "10"
 mvn -Popenliberty clean package liberty:run
 ```
 
 The Open Liberty Maven profile writes `AI_DOCS_DIR` to `server.env` for local runs. The container image uses `/config/ai-docs`.
 
-The same settings work with Azure OpenAI v1 endpoints, GitHub Models, OpenAI, and local OpenAI-compatible servers such as Ollama `/v1`.
+Examples, subject to the provider docs:
+
+- OpenAI: `https://api.openai.com/v1`
+- GitHub Models: `https://models.github.ai/inference`, model names like `openai/gpt-5-mini`, and a GitHub token as the key
+- Azure OpenAI v1: `https://YOUR-RESOURCE.openai.azure.com/openai/v1/`
+- Ollama: `http://localhost:11434/v1`
 
 Do not commit keys. Use environment variables or Kubernetes secrets.
 
@@ -81,20 +87,20 @@ mvn -Popenliberty -DskipTests package
 Run eval tests when a model endpoint is configured:
 
 ```powershell
-$env:AI_BASE_URL = "https://models.inference.ai.azure.com/v1"
-$env:AI_API_KEY = "your key"
-$env:AI_CHAT_MODEL = "gpt-5-mini"
+$env:AI_BASE_URL = "YOUR_OPENAI_COMPATIBLE_ENDPOINT"
+$env:AI_API_KEY = "YOUR_KEY"
+$env:AI_CHAT_MODEL = "YOUR_MODEL"
 mvn -Popenliberty -Dtest=CargoAssistantEvalTest test
 ```
 
-The right-cargo eval skips itself when neither `AI_API_KEY` nor `AI_BASE_URL` is set. The off-topic eval runs offline.
+All model evals skip when neither `AI_API_KEY` nor `AI_BASE_URL` is set. The off-topic eval runs offline.
 
 ## Trace the demo
 
 Open Liberty keeps telemetry export off by default. Start Jaeger all-in-one when you want traces:
 
 ```powershell
-docker run --rm --name jaeger -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
+docker run --rm --name jaeger -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/jaeger:latest
 ```
 
 Start Liberty with runtime-level telemetry settings:
@@ -163,9 +169,43 @@ Use rollout undo for bad code or image changes. Turn `enabled` off for a bad mod
 
 ### Demo 3: Break it
 
-1. Deploy to Kubernetes.
-2. Set a bad endpoint or short timeout.
-3. Ask a cargo question and show the fallback.
-4. Rotate the API key in the secret.
-5. Restart the deployment.
-6. Roll back a bad model version by disabling AI or using rollout undo.
+1. Deploy and show the pods ready.
+
+   ```powershell
+   kubectl apply -f k8s/configmap.yaml
+   kubectl apply -f k8s/otel-config.yaml
+   kubectl apply -f k8s/secret-example.yaml
+   kubectl apply -f k8s/deployment.yaml
+   kubectl apply -f k8s/service.yaml
+   kubectl get pods -l app=cargo-tracker
+   ```
+
+2. Make the model fail. Ask a question, see the fallback, and show the failed `chat` span.
+
+   ```powershell
+   kubectl patch configmap ai-config -p '{"data":{"base-url":"http://10.255.255.1/v1","timeout-seconds":"3"}}'
+   kubectl rollout restart deployment/cargo-tracker
+   ```
+
+3. Restore the endpoint and timeout, then restart.
+
+   ```powershell
+   kubectl patch configmap ai-config -p '{"data":{"base-url":"YOUR_OPENAI_COMPATIBLE_ENDPOINT","timeout-seconds":"10"}}'
+   kubectl rollout restart deployment/cargo-tracker
+   ```
+
+4. Rotate the key without a new image.
+
+   ```powershell
+   kubectl create secret generic ai-endpoint --from-literal=api-key=NEW_KEY --dry-run=client -o yaml | kubectl apply -f -
+   kubectl rollout restart deployment/cargo-tracker
+   ```
+
+5. Change model version by pull request. Edit `chat-model` in `k8s/configmap.yaml`. `eval.yml` runs against that model. If the pass rules fail, do not merge the change.
+
+6. Roll back a bad release. The new pod never gets ready, and the old pods keep serving.
+
+   ```powershell
+   kubectl set image deployment/cargo-tracker app=ghcr.io/example/cargo-tracker:does-not-exist
+   kubectl rollout undo deployment/cargo-tracker
+   ```

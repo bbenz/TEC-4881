@@ -5,6 +5,7 @@ on:
     paths:
     - src/main/resources/prompts/**
     - src/main/ai-docs/**
+    - src/main/java/org/eclipse/cargotracker/ai/**
     - src/test/resources/eval/**
     - k8s/configmap.yaml
   workflow_dispatch:
@@ -31,10 +32,16 @@ jobs:
         else
           echo "run_eval=true" >> "$GITHUB_OUTPUT"
         fi
+    - name: Read model from Kubernetes config
+      if: steps.secrets.outputs.run_eval == 'true'
+      id: model
+      run: |
+        model=$(yq '.data."chat-model"' k8s/configmap.yaml)
+        echo "AI_CHAT_MODEL=$model" >> "$GITHUB_ENV"
+        echo "model=$model" >> "$GITHUB_OUTPUT"
     - name: Run eval tests
       if: steps.secrets.outputs.run_eval == 'true'
       env:
         AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
         AI_API_KEY: ${{ secrets.AI_API_KEY }}
-        AI_CHAT_MODEL: ${{ vars.AI_CHAT_MODEL }}
       run: mvn -B -Popenliberty -Dtest=CargoAssistantEvalTest test

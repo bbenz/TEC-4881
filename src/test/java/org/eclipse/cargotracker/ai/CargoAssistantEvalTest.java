@@ -11,12 +11,13 @@ import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import io.opentelemetry.api.OpenTelemetry;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,20 +30,9 @@ class CargoAssistantEvalTest {
 
   private static final int MAX_TOKENS_PER_ANSWER = 2_500;
   private static final long P95_LATENCY_LIMIT_MILLIS = 4_000;
-  private static final Set<String> KNOWN_SOURCES =
-      Set.of(
-          "claims.md",
-          "customs-holds.md",
-          "delivery-delays.md",
-          "hazardous-cargo.md",
-          "misdirected-cargo.md",
-          "rerouting.md",
-          "cargoStatus",
-          "listCargos",
-          "tool:cargoStatus",
-          "tool:listCargos");
 
   private CargoAssistant guardedAssistant;
+  private DocumentSourceCatalog sourceCatalog;
   private List<EvalResult> modelResults = List.of();
   private boolean modelConfigured;
 
@@ -54,15 +44,23 @@ class CargoAssistantEvalTest {
       return;
     }
 
+    sourceCatalog = new DocumentSourceCatalog();
     EvalTokenCounter tokenCounter = new EvalTokenCounter();
     CargoAssistant modelAssistant = configuredAssistant(tokenCounter);
     List<EvalResult> results = new ArrayList<>();
     for (EvalCase evalCase : EvalCase.load("/eval/cargo-questions.csv")) {
       tokenCounter.reset();
       long started = System.nanoTime();
-      CargoAnswer answer = modelAssistant.answer(evalCase.question());
+      CargoAnswer answer = CargoAnswer.cannotAnswer();
+      String error = null;
+      try {
+        answer = modelAssistant.answer(evalCase.question());
+      } catch (RuntimeException e) {
+        error = e.getMessage();
+      }
       long elapsedMillis = Duration.ofNanos(System.nanoTime() - started).toMillis();
-      results.add(new EvalResult(evalCase, answer, elapsedMillis, tokenCounter.totalTokens()));
+      results.add(
+          new EvalResult(evalCase, answer, elapsedMillis, tokenCounter.totalTokens(), error));
     }
     modelResults = List.copyOf(results);
   }
@@ -75,27 +73,20 @@ class CargoAssistantEvalTest {
   }
 
   @Test
-  // spotless:off
   void findsTheRightCargo() {
     assumeModelConfigured();
 
-    long correct =
-        modelResults.stream()
-            .filter(r -> hasExpectedId(r.answer(), r.evalCase()))
-            .count();
+    long correct = modelResults.stream().filter(EvalResult::foundExpectedId).count();
 
     assertThat(correct).isGreaterThanOrEqualTo(38);
   }
-  // spotless:on
 
   @ParameterizedTest
   @CsvFileSource(resources = "/eval/off-topic.csv")
-  // spotless:off
   void refusesOffTopicQuestions(String question) {
     assertThatThrownBy(() -> guardedAssistant.answer(question))
         .isInstanceOf(InputGuardrailException.class);
   }
-  // spotless:on
 
   @Test
   void citesRealSources() {
@@ -105,7 +96,7 @@ class CargoAssistantEvalTest {
         .allSatisfy(
             result -> {
               assertThat(result.answer().sources()).isNotEmpty();
-              assertThat(result.answer().sources()).allMatch(KNOWN_SOURCES::contains);
+              assertThat(result.answer().sources()).allMatch(sourceCatalog::isKnown);
             });
   }
 
@@ -140,10 +131,6 @@ class CargoAssistantEvalTest {
         .allSatisfy(result -> assertThat(result.tokens()).isLessThan(MAX_TOKENS_PER_ANSWER));
   }
 
-  private boolean hasExpectedId(CargoAnswer answer, EvalCase evalCase) {
-    return answer.trackingIds().contains(evalCase.expectedId());
-  }
-
   private void assumeModelConfigured() {
     assumeTrue(modelConfigured, "AI model not configured");
   }
@@ -169,12 +156,19 @@ class CargoAssistantEvalTest {
             .maxRetries(1)
             .listeners(tokenCounter)
             .build();
-    ContentRetriever docs = query -> List.of();
+    ContentRetriever docs =
+        DocumentIndex.build(
+            Path.of("src/main/ai-docs"), sourceCatalog, OpenTelemetry.noop().getTracer("eval"));
     return AssistantFactory.create(chatModel, docs, new CargoTools(new FakeCargoLookup()));
   }
 
   private record EvalResult(
-      EvalCase evalCase, CargoAnswer answer, long latencyMillis, int tokens) {}
+      EvalCase evalCase, CargoAnswer answer, long latencyMillis, int tokens, String error) {
+
+    boolean foundExpectedId() {
+      return answer.trackingIds().contains(evalCase.expectedId());
+    }
+  }
 
   private static final class EvalTokenCounter implements ChatModelListener {
 

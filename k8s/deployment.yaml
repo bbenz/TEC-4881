@@ -19,22 +19,21 @@ spec:
         ports:
         - name: http
           containerPort: 8080
+        envFrom:
+        - configMapRef: { name: otel-config }
         env:
         - name: AI_ENABLED
           valueFrom: { configMapKeyRef: { name: ai-config, key: enabled } }
         - name: AI_CHAT_MODEL
           valueFrom: { configMapKeyRef: { name: ai-config, key: chat-model } }
+        - name: AI_API_KEY
+          valueFrom: { secretKeyRef: { name: ai-endpoint, key: api-key } }
         - name: AI_BASE_URL
           valueFrom: { configMapKeyRef: { name: ai-config, key: base-url } }
         - name: AI_TIMEOUT_SECONDS
           valueFrom: { configMapKeyRef: { name: ai-config, key: timeout-seconds } }
         - name: AI_DOCS_DIR
           valueFrom: { configMapKeyRef: { name: ai-config, key: docs-dir } }
-        - name: AI_API_KEY
-          valueFrom: { secretKeyRef: { name: ai-endpoint, key: api-key } }
-        envFrom:
-        - configMapRef:
-            name: otel-config
         readinessProbe:
           httpGet:
             path: /health/ready
