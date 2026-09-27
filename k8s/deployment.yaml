@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cargo-tracker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cargo-tracker
+  template:
+    metadata:
+      labels:
+        app: cargo-tracker
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/example/cargo-tracker:2.4.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 9080
+        env:
+        - name: AI_ENABLED
+          valueFrom: { configMapKeyRef: { name: ai-config, key: enabled } }
+        - name: AI_CHAT_MODEL
+          valueFrom: { configMapKeyRef: { name: ai-config, key: chat-model } }
+        - name: AI_BASE_URL
+          valueFrom: { configMapKeyRef: { name: ai-config, key: base-url } }
+        - name: AI_TIMEOUT_SECONDS
+          valueFrom: { configMapKeyRef: { name: ai-config, key: timeout-seconds } }
+        - name: AI_DOCS_DIR
+          valueFrom: { configMapKeyRef: { name: ai-config, key: docs-dir } }
+        - name: AI_API_KEY
+          valueFrom: { secretKeyRef: { name: ai-endpoint, key: api-key } }
+        readinessProbe:
+          httpGet:
+            path: /cargo-tracker/
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /cargo-tracker/
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 250m
+            memory: 768Mi
+          limits:
+            cpu: "1"
+            memory: 1536Mi

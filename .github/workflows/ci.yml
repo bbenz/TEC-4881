@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_eval:
+        description: Run model evals when secrets are configured
+        required: false
+        default: "false"
+
+jobs:
+  offline:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - uses: actions/setup-java@v6.0.1
+      with:
+        distribution: microsoft
+        java-version: "21"
+        cache: maven
+    - name: Build WAR and run offline tests
+      shell: pwsh
+      run: mvn -Popenliberty -Dtest=!BookingServiceTest test
+
+  eval:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_eval == 'true'
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - uses: actions/setup-java@v6.0.1
+      with:
+        distribution: microsoft
+        java-version: "21"
+        cache: maven
+    - name: Run eval tests
+      shell: pwsh
+      env:
+        AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+        AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        AI_CHAT_MODEL: ${{ vars.AI_CHAT_MODEL }}
+      run: mvn -Popenliberty -Dtest=CargoAssistantEvalTest test

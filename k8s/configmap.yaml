@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-config
+data:
+  enabled: "false"
+  chat-model: gpt-5-mini
+  base-url: https://api.openai.com/v1
+  timeout-seconds: "10"
+  docs-dir: /config/ai-docs
