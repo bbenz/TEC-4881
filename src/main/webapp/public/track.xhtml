@@ -20,6 +20,32 @@
             </h:panelGrid>
           </h:form>
       </p:card>
+
+      <p:card>
+        <h3>Ask about your cargo</h3>
+        <p>Ask about cargo status, delivery delays, customs, claims, or rerouting.</p>
+        <textarea id="assistantQuestion" rows="3" style="width: 100%" placeholder="Where is ABC123?"></textarea>
+        <br />
+        <button type="button" onclick="askCargoAssistant()">Ask</button>
+        <pre id="assistantAnswer" style="white-space: pre-wrap"></pre>
+      </p:card>
+      <script type="text/javascript">
+        function askCargoAssistant() {
+          const answer = document.getElementById('assistantAnswer');
+          const question = document.getElementById('assistantQuestion').value;
+          answer.textContent = 'Asking...';
+          fetch('#{request.contextPath}/rest/assistant', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: question})
+          })
+          .then(response => response.json())
+          .then(data => {
+            answer.textContent = data.answer + '\nSources: ' + (data.sources || []).join(', ');
+          })
+          .catch(() => { answer.textContent = "I can't answer that."; });
+        }
+      </script>
       <div class="ui-g-12">
         <p:separator />
       </div>
