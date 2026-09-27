@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-config
+data:
+  OTEL_SDK_DISABLED: "false"
+  OTEL_SERVICE_NAME: cargo-tracker
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317

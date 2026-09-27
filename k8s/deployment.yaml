@@ -18,7 +18,7 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
-          containerPort: 9080
+          containerPort: 8080
         env:
         - name: AI_ENABLED
           valueFrom: { configMapKeyRef: { name: ai-config, key: enabled } }
@@ -32,15 +32,18 @@ spec:
           valueFrom: { configMapKeyRef: { name: ai-config, key: docs-dir } }
         - name: AI_API_KEY
           valueFrom: { secretKeyRef: { name: ai-endpoint, key: api-key } }
+        envFrom:
+        - configMapRef:
+            name: otel-config
         readinessProbe:
           httpGet:
-            path: /cargo-tracker/
+            path: /health/ready
             port: http
           initialDelaySeconds: 20
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /cargo-tracker/
+            path: /health/live
             port: http
           initialDelaySeconds: 60
           periodSeconds: 20

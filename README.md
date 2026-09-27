@@ -14,7 +14,7 @@ Idea: treat the model like any other remote dependency.
 - Validate structured model output.
 - Test guards and fallback behavior offline.
 - Run evals when a model endpoint is configured.
-- Trace model calls with OpenTelemetry.
+- Trace model calls, document retrieval, and tools with OpenTelemetry.
 - Containerize the app and deploy it to Kubernetes.
 
 This repo is based on [Eclipse Cargo Tracker](CARGO-TRACKER.md). It keeps the upstream license and notices.
@@ -27,9 +27,9 @@ This repo is based on [Eclipse Cargo Tracker](CARGO-TRACKER.md). It keeps the up
 - `DocumentRetrieverProducer` and `src/main/ai-docs`: local document search.
 - `StaysOnTopic`: deterministic input guard.
 - `AssistantResource`: `POST /rest/assistant`.
-- `ModelCallTracing`: OpenTelemetry spans for chat calls.
+- `ModelCallTracing` and `TracingContentRetriever`: OpenTelemetry spans.
 - `src/test/resources/eval`: eval questions and refusal cases.
-- `k8s`: deployment, service, config, and secret example.
+- `k8s`: deployment, service, config, tracing config, and secret example.
 - `Dockerfile`: Open Liberty image for Java 21.
 - `.github/workflows/ci.yml`: offline CI and optional eval job.
 
@@ -53,9 +53,10 @@ $env:AI_BASE_URL = "https://models.inference.ai.azure.com/v1"
 $env:AI_API_KEY = "your key"
 $env:AI_CHAT_MODEL = "gpt-5-mini"
 $env:AI_TIMEOUT_SECONDS = "10"
-$env:AI_DOCS_DIR = "src/main/ai-docs"
 mvn -Popenliberty clean package liberty:run
 ```
+
+The Open Liberty Maven profile writes `AI_DOCS_DIR` to `server.env` for local runs. The container image uses `/config/ai-docs`.
 
 The same settings work with Azure OpenAI v1 endpoints, GitHub Models, OpenAI, and local OpenAI-compatible servers such as Ollama `/v1`.
 
@@ -66,8 +67,10 @@ Do not commit keys. Use environment variables or Kubernetes secrets.
 Offline tests:
 
 ```powershell
-mvn -Popenliberty -Dtest=!BookingServiceTest test
+mvn -Popenliberty test
 ```
+
+The Open Liberty profile excludes the Arquillian server test, so this command stays offline.
 
 Build the WAR without tests:
 
@@ -86,18 +89,43 @@ mvn -Popenliberty -Dtest=CargoAssistantEvalTest test
 
 The right-cargo eval skips itself when neither `AI_API_KEY` nor `AI_BASE_URL` is set. The off-topic eval runs offline.
 
-## Deploy to Kubernetes
+## Trace the demo
 
-Build and push an image outside this repo, then edit `k8s/deployment.yaml` if needed. The sample uses:
+Open Liberty keeps telemetry export off by default. Start Jaeger all-in-one when you want traces:
 
-```text
-ghcr.io/example/cargo-tracker:2.4.1
+```powershell
+docker run --rm --name jaeger -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
 ```
+
+Start Liberty with runtime-level telemetry settings:
+
+```powershell
+$env:OTEL_SDK_DISABLED = "false"
+$env:OTEL_SERVICE_NAME = "cargo-tracker"
+$env:OTEL_TRACES_EXPORTER = "otlp"
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317"
+mvn -Popenliberty liberty:run
+```
+
+Open <http://localhost:16686> and search for `cargo-tracker`.
+
+## Build the image
+
+Docker is not needed for local tests. To build the image on a machine with Docker:
+
+```powershell
+docker build -t ghcr.io/example/cargo-tracker:2.4.1 .
+```
+
+The Dockerfile runs Maven in a build stage, then copies the WAR, Liberty config, AI docs, and HSQLDB driver into the Open Liberty image.
+
+## Deploy to Kubernetes
 
 Apply the manifests:
 
 ```powershell
 kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/otel-config.yaml
 kubectl apply -f k8s/secret-example.yaml
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
@@ -126,10 +154,12 @@ Use rollout undo for bad code or image changes. Turn `enabled` off for a bad mod
 
 ### Demo 2: Measure it
 
-1. Run evals against model version A.
-2. Change `AI_CHAT_MODEL` to model version B.
-3. Run evals again.
-4. Open a trace and show the model span.
+1. Start Jaeger all-in-one.
+2. Start Liberty with `OTEL_SDK_DISABLED=false` and the OTLP endpoint.
+3. Run evals against model version A.
+4. Change `AI_CHAT_MODEL` to model version B.
+5. Run evals again.
+6. Open a trace and show `retrieve documents`, `chat gpt-5-mini`, and tool spans.
 
 ### Demo 3: Break it
 
