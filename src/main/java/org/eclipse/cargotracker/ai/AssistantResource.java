@@ -1,5 +1,6 @@
 package org.eclipse.cargotracker.ai;
 
+import io.opentelemetry.api.trace.Span;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -18,7 +19,11 @@ public class AssistantResource {
 
   @POST
   public CargoAnswer ask(@Valid AssistantQuestion question) {
-    return questionService.ask(question.question());
+    CargoAnswer answer = questionService.ask(question.question());
+    if (!answer.trackingIds().isEmpty()) {
+      Span.current().setAttribute("cargo.tracking_id", answer.trackingIds().get(0));
+    }
+    return answer;
   }
 
   public record AssistantQuestion(@NotBlank String question) {}

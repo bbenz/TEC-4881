@@ -10,7 +10,7 @@ public interface CargoLookup {
 
   List<CargoSummary> listCargos();
 
-  boolean isKnownTrackingId(String trackingId);
+  boolean exists(String trackingId);
 
   Set<String> knownTrackingIds();
 }

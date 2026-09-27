@@ -59,7 +59,7 @@ class FakeCargoLookup implements CargoLookup {
   }
 
   @Override
-  public boolean isKnownTrackingId(String trackingId) {
+  public boolean exists(String trackingId) {
     return cargos.containsKey(trackingId);
   }
 

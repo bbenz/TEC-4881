@@ -12,6 +12,7 @@
     <feature>jndi-1.0</feature>
     <feature>jsonb-3.0</feature>
     <feature>mpConfig-3.1</feature>
+    <feature>mpHealth-4.0</feature>
     <feature>mpTelemetry-2.0</feature>
     <feature>localConnector-1.0</feature>
     <feature>mdb-4.0</feature>
@@ -101,7 +102,7 @@
 
   <jdbcDriver id="dbDriver" libraryRef="dbLib"/>
 
-  <library id="dbLib">
+  <library apiTypeVisibility="+third-party" id="dbLib">
     <fileset dir="${shared.resource.dir}" includes="hsqldb*.jar"/>
   </library>
 
@@ -125,7 +126,7 @@
   </ejbContainer>
 
   <webApplication contextRoot="cargo-tracker" location="cargo-tracker.war">
-    <classloader commonLibraryRef="dbLib"/>
+    <classloader apiTypeVisibility="+third-party" commonLibraryRef="dbLib"/>
     <web-bnd moduleName="cargo-tracker">
       <env-entry name="java:app/configuration/GraphTraversalUrl" value="http://localhost:8080/cargo-tracker/rest/graph-traversal/shortest-path"/>
     </web-bnd>

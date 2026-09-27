@@ -11,6 +11,7 @@ import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
@@ -24,6 +25,7 @@ public class DocumentRetrieverProducer {
 
   @Inject private AiConfiguration configuration;
   @Inject private DocumentSourceCatalog sourceCatalog;
+  @Inject private Tracer tracer;
   @Inject private Logger logger;
 
   @Produces
@@ -41,7 +43,9 @@ public class DocumentRetrieverProducer {
           FileSystemDocumentLoader.loadDocumentsRecursively(configuration.docsDir());
       documents.forEach(
           document -> sourceCatalog.add(document.metadata().getString(Document.FILE_NAME)));
+      logger.info("Indexed " + documents.size() + " AI sample documents.");
 
+      // Indexing: at startup
       EmbeddingStoreIngestor.builder()
           .documentSplitter(DocumentSplitters.recursive(500, 50))
           .embeddingModel(embeddingModel)
@@ -49,12 +53,15 @@ public class DocumentRetrieverProducer {
           .build()
           .ingest(documents);
 
-      return EmbeddingStoreContentRetriever.builder()
-          .embeddingStore(store)
-          .embeddingModel(embeddingModel)
-          .maxResults(5)
-          .minScore(0.7)
-          .build();
+      // Retrieval: for every question
+      ContentRetriever retriever =
+          EmbeddingStoreContentRetriever.builder()
+              .embeddingStore(store)
+              .embeddingModel(embeddingModel)
+              .maxResults(5)
+              .minScore(0.7)
+              .build();
+      return new TracingContentRetriever(retriever, tracer);
     } catch (RuntimeException e) {
       logger.log(Level.WARNING, "AI document search disabled", e);
       return query -> List.of();

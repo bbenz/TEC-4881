@@ -17,24 +17,26 @@ import org.junit.jupiter.params.provider.CsvFileSource;
 
 class CargoAssistantEvalTest {
 
-  private CargoAssistant assistant;
+  private CargoAssistant guardedAssistant;
 
   @BeforeEach
   void setUp() {
-    assistant =
+    guardedAssistant =
         AssistantFactory.create(
-            new ThrowingChatModel(), query -> List.of(), new CargoTools(new FakeCargoLookup()));
+            new ThrowingChatModel(),
+            query -> List.of(),
+            new CargoTools(new FakeCargoLookup()));
   }
 
   @Test
   void findsTheRightCargo() {
-    assumeTrue(System.getenv("AI_API_KEY") != null || System.getenv("AI_BASE_URL") != null);
+    assumeModelConfigured();
     List<EvalCase> cases = EvalCase.load("/eval/cargo-questions.csv");
-    CargoAssistant assistant = configuredAssistant();
+    CargoAssistant modelAssistant = configuredAssistant();
 
     long correct =
         cases.stream()
-            .filter(c -> assistant.answer(c.question()).trackingIds().contains(c.expectedId()))
+            .filter(c -> hasExpectedId(modelAssistant, c))
             .count();
 
     assertThat(correct).isGreaterThanOrEqualTo(38);
@@ -43,12 +45,29 @@ class CargoAssistantEvalTest {
   @ParameterizedTest
   @CsvFileSource(resources = "/eval/off-topic.csv")
   void refusesOffTopicQuestions(String question) {
-    assertThatThrownBy(() -> assistant.answer(question))
+    assertThatThrownBy(() -> guardedAssistant.answer(question))
         .isInstanceOf(InputGuardrailException.class);
   }
 
+  private boolean hasExpectedId(
+      CargoAssistant assistant,
+      EvalCase evalCase) {
+    return assistant.answer(evalCase.question())
+        .trackingIds()
+        .contains(evalCase.expectedId());
+  }
+
+  private void assumeModelConfigured() {
+    assumeTrue(
+        System.getenv("AI_API_KEY") != null
+            || System.getenv("AI_BASE_URL") != null);
+  }
+
   private CargoAssistant configuredAssistant() {
-    String baseUrl = System.getenv().getOrDefault("AI_BASE_URL", "https://api.openai.com/v1");
+    String baseUrl =
+        System.getenv().getOrDefault(
+            "AI_BASE_URL",
+            "https://api.openai.com/v1");
     String apiKey = System.getenv().getOrDefault("AI_API_KEY", "not-used");
     String model = System.getenv().getOrDefault("AI_CHAT_MODEL", "gpt-5-mini");
     ChatModel chatModel =
@@ -60,6 +79,9 @@ class CargoAssistantEvalTest {
             .maxRetries(1)
             .build();
     ContentRetriever docs = query -> List.of();
-    return AssistantFactory.create(chatModel, docs, new CargoTools(new FakeCargoLookup()));
+    return AssistantFactory.create(
+        chatModel,
+        docs,
+        new CargoTools(new FakeCargoLookup()));
   }
 }

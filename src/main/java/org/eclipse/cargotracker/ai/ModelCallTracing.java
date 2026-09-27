@@ -6,24 +6,29 @@ import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.output.TokenUsage;
-import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
-import jakarta.enterprise.inject.Vetoed;
 
-@Vetoed
 public class ModelCallTracing implements ChatModelListener {
 
   private static final String SPAN_KEY = ModelCallTracing.class.getName() + ".span";
-  private final Tracer tracer = GlobalOpenTelemetry.getTracer("org.eclipse.cargotracker.ai");
+
+  private final Tracer tracer;
+
+  public ModelCallTracing(Tracer tracer) {
+    this.tracer = tracer;
+  }
 
   @Override
   public void onRequest(ChatModelRequestContext context) {
-    Span span = tracer.spanBuilder("gen_ai.chat").startSpan();
+    String modelName = context.chatRequest().modelName();
+    String spanName = modelName == null ? "chat" : "chat " + modelName;
+    Span span = tracer.spanBuilder(spanName).setSpanKind(SpanKind.CLIENT).startSpan();
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", providerName(context.modelProvider()));
-    String modelName = context.chatRequest().modelName();
     if (modelName != null) {
       span.setAttribute("gen_ai.request.model", modelName);
     }
@@ -47,7 +52,8 @@ public class ModelCallTracing implements ChatModelListener {
       }
       if (context.chatResponse().finishReason() != null) {
         span.setAttribute(
-            "gen_ai.response.finish_reasons", context.chatResponse().finishReason().name());
+            AttributeKey.stringArrayKey("gen_ai.response.finish_reasons"),
+            java.util.List.of(context.chatResponse().finishReason().name()));
       }
     } finally {
       span.end();
@@ -63,6 +69,8 @@ public class ModelCallTracing implements ChatModelListener {
     try {
       span.recordException(context.error());
       span.setStatus(StatusCode.ERROR, context.error().getMessage());
+      span.setAttribute("otel.status_code", "ERROR");
+      span.setAttribute("error.type", context.error().getClass().getName());
     } finally {
       span.end();
     }
@@ -79,6 +87,12 @@ public class ModelCallTracing implements ChatModelListener {
   }
 
   private String providerName(ModelProvider provider) {
-    return provider == null ? "openai" : provider.name().toLowerCase().replace('_', '-');
+    if (provider == ModelProvider.OPEN_AI) {
+      return "openai";
+    }
+    if (provider == ModelProvider.AZURE_OPEN_AI) {
+      return "azure.ai.openai";
+    }
+    return provider == null ? "openai" : provider.name().toLowerCase();
   }
 }

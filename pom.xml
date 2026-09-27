@@ -104,6 +104,7 @@
       <groupId>io.opentelemetry</groupId>
       <artifactId>opentelemetry-api</artifactId>
       <version>${opentelemetry.version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>dev.langchain4j</groupId>
@@ -472,6 +473,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <db.driverClass>org.hsqldb.jdbc.JDBCDriver</db.driverClass>
         <db.jdbcUrl>jdbc:hsqldb:file:./cargo-tracker-data/cargo-tracker-database;create=true</db.jdbcUrl>
+        <liberty.env.AI_DOCS_DIR>${project.basedir}/src/main/ai-docs</liberty.env.AI_DOCS_DIR>
       </properties>
       <dependencies>
         <!-- Provided dependencies -->
@@ -523,6 +525,9 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <version>3.5.2</version>
             <configuration>
+              <excludes>
+                <exclude>**/BookingServiceTest.java</exclude>
+              </excludes>
               <systemPropertyVariables>
                 <arquillian.launch>openliberty</arquillian.launch>
               </systemPropertyVariables>

@@ -31,7 +31,7 @@ public class RepositoryCargoLookup implements CargoLookup {
   }
 
   @Override
-  public boolean isKnownTrackingId(String trackingId) {
+  public boolean exists(String trackingId) {
     return trackingId != null && cargoRepository.find(new TrackingId(trackingId)) != null;
   }
 
